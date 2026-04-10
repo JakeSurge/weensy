@@ -63,11 +63,17 @@ void kernel_start(const char* command) {
     for (vmiter it(kernel_pagetable);
          it.va() < MEMSIZE_PHYSICAL;
          it += PAGESIZE) {
-        if (it.va() != 0) {
-            it.map(it.va(), PTE_P | PTE_W | PTE_U);
-        } else {
+        if (it.va() == 0) {
             // nullptr is inaccessible even to the kernel
             it.map(it.va(), 0);
+        }
+        // If console page or in application area of memory make user accessible
+        else if (it.va() == CONSOLE_ADDR || it.va() >= PROC_START_ADDR) {
+            it.map(it.va(), PTE_P | PTE_W | PTE_U);
+        }
+        // Otherwise make kernel only
+        else {
+            it.map(it.va(), PTE_P | PTE_W);
         }
     }
 
@@ -320,9 +326,14 @@ uintptr_t syscall(regstate* regs) {
 // syscall_page_alloc(addr)
 //    Handles the SYSCALL_PAGE_ALLOC system call. This function
 //    should implement the specification for `sys_page_alloc`
-//    in `u-lib.hh` (but in the handout code, it does not).
+//    in `u-lib.hh`
 
 int syscall_page_alloc(uintptr_t addr) {
+    // Verify the addr is a page size multiple, is in application memory, and not outside max size
+    if (addr % PAGESIZE != 0 || addr < PROC_START_ADDR || addr >= MEMSIZE_VIRTUAL) {
+        return -1;
+    }
+
     assert(physpages[addr / PAGESIZE].refcount == 0);
     ++physpages[addr / PAGESIZE].refcount;
     memset((void*) addr, 0, PAGESIZE);
