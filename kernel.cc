@@ -330,7 +330,7 @@ uintptr_t syscall(regstate* regs) {
 
 int syscall_page_alloc(uintptr_t addr) {
     // Verify the addr is a page size multiple, is in application memory, and not outside max size
-    if (addr % PAGESIZE != 0 || addr < PROC_START_ADDR || addr >= MEMSIZE_VIRTUAL) {
+    if ((addr & PAGEOFFMASK) != 0 || addr < PROC_START_ADDR || addr >= MEMSIZE_VIRTUAL) {
         return -1;
     }
 
