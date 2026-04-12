@@ -348,16 +348,18 @@ int syscall_page_alloc(uintptr_t addr) {
     }
 
     // Verify physical addr is available
-    assert(physpages[addr / PAGESIZE].refcount == 0);
-    ++physpages[addr / PAGESIZE].refcount;
+    void* pa = kalloc(PAGESIZE);
+    if (pa == nullptr) {
+        return -1;
+    }
 
     // Try to map to current process pagetable
-    if ((vmiter(ptable[current->pid].pagetable).find(addr).try_map(addr, PTE_P | PTE_W | PTE_U)) < 0) {
+    if ((vmiter(ptable[current->pid].pagetable).find(addr).try_map(pa, PTE_P | PTE_W | PTE_U)) < 0) {
         return -1;
     }
 
     // 0 out memory
-    memset((void*) addr, 0, PAGESIZE);
+    memset(pa, 0, PAGESIZE);
     
     return 0;
 }
