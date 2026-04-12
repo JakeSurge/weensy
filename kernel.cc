@@ -175,6 +175,9 @@ void process_setup(pid_t pid, const char* program_name) {
             // address is currently free.)
             assert(physpages[a / PAGESIZE].refcount == 0);
             ++physpages[a / PAGESIZE].refcount;
+
+            // Map global memory
+            vmiter(ptable[pid].pagetable).find(a).map(a, PTE_P | PTE_W | PTE_U);
         }
     }
 
@@ -195,6 +198,9 @@ void process_setup(pid_t pid, const char* program_name) {
     assert(physpages[stack_addr / PAGESIZE].refcount == 0);
     ++physpages[stack_addr / PAGESIZE].refcount;
     ptable[pid].regs.reg_rsp = stack_addr + PAGESIZE;
+
+    // Map stack memory
+    vmiter(ptable[pid].pagetable).find(stack_addr).map(stack_addr, PTE_P | PTE_W | PTE_U);
 
     // mark process as runnable
     ptable[pid].state = P_RUNNABLE;
