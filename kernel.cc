@@ -171,20 +171,22 @@ void process_setup(pid_t pid, const char* program_name) {
              a < seg.va() + seg.size();
              a += PAGESIZE) {
             // `a` is the process virtual address for the next code or data page
-            // (The handout code requires that the corresponding physical
-            // address is currently free.)
-            assert(physpages[a / PAGESIZE].refcount == 0);
-            ++physpages[a / PAGESIZE].refcount;
+            // Allocate physical page
+            void* pa = kalloc(PAGESIZE);
+            assert(pa != nullptr);
 
             // Map global memory
-            vmiter(ptable[pid].pagetable).find(a).map(a, PTE_P | PTE_W | PTE_U);
+            vmiter(ptable[pid].pagetable).find(a).map(pa, PTE_P | PTE_W | PTE_U);
         }
     }
 
     // initialize data in loadable segments
     for (auto seg = pgm.begin(); seg != pgm.end(); ++seg) {
-        memset((void*) seg.va(), 0, seg.size());
-        memcpy((void*) seg.va(), seg.data(), seg.data_size());
+        // Find physical addr with virtual via pagetable
+        void* pa = (void*) vmiter(ptable[pid].pagetable).find(seg.va()).pa();
+        
+        memset(pa, 0, seg.size());
+        memcpy(pa, seg.data(), seg.data_size());
     }
 
     // mark entry point
