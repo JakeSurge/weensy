@@ -193,14 +193,16 @@ void process_setup(pid_t pid, const char* program_name) {
     // allocate and map stack segment
     // Compute process virtual address for stack page
     uintptr_t stack_addr = PROC_START_ADDR + PROC_SIZE * pid - PAGESIZE;
-    // The handout code requires that the corresponding physical address
-    // is currently free.
-    assert(physpages[stack_addr / PAGESIZE].refcount == 0);
-    ++physpages[stack_addr / PAGESIZE].refcount;
+    
+    // Verify and allocate physical page address
+    void* pa = kalloc(PAGESIZE);
+    assert(pa != nullptr);
+
+    // Set stack pointer
     ptable[pid].regs.reg_rsp = stack_addr + PAGESIZE;
 
     // Map stack memory
-    vmiter(ptable[pid].pagetable).find(stack_addr).map(stack_addr, PTE_P | PTE_W | PTE_U);
+    vmiter(ptable[pid].pagetable).find(stack_addr).map(pa, PTE_P | PTE_W | PTE_U);
 
     // mark process as runnable
     ptable[pid].state = P_RUNNABLE;
