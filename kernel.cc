@@ -155,8 +155,11 @@ void process_setup(pid_t pid, const char* program_name) {
     // initialize process page table
     ptable[pid].pagetable = kalloc_pagetable();
 
+    // Create vmiter for process page table
+    vmiter pt(ptable[pid].pagetable);
+
     // Copy mappings from kernel_pagetable
-    for (vmiter kt(kernel_pagetable), pt(ptable[pid].pagetable);
+    for (vmiter kt(kernel_pagetable);
          kt.va() < PROC_START_ADDR;
          kt += PAGESIZE, pt += PAGESIZE) {
             pt.map(kt.pa(), kt.perm());
@@ -176,14 +179,14 @@ void process_setup(pid_t pid, const char* program_name) {
             assert(pa != nullptr);
 
             // Map global memory
-            vmiter(ptable[pid].pagetable).find(a).map(pa, PTE_P | PTE_W | PTE_U);
+            pt.find(a).map(pa, PTE_P | PTE_W | PTE_U);
         }
     }
 
     // initialize data in loadable segments
     for (auto seg = pgm.begin(); seg != pgm.end(); ++seg) {
         // Find physical addr with virtual via pagetable
-        void* pa = (void*) vmiter(ptable[pid].pagetable).find(seg.va()).pa();
+        void* pa = (void*) pt.find(seg.va()).pa();
         
         memset(pa, 0, seg.size());
         memcpy(pa, seg.data(), seg.data_size());
@@ -204,7 +207,7 @@ void process_setup(pid_t pid, const char* program_name) {
     ptable[pid].regs.reg_rsp = stack_addr + PAGESIZE;
 
     // Map stack memory
-    vmiter(ptable[pid].pagetable).find(stack_addr).map(pa, PTE_P | PTE_W | PTE_U);
+    pt.find(stack_addr).map(pa, PTE_P | PTE_W | PTE_U);
 
     // mark process as runnable
     ptable[pid].state = P_RUNNABLE;
