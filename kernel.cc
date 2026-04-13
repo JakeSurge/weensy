@@ -65,15 +65,15 @@ void kernel_start(const char* command) {
          it += PAGESIZE) {
         if (it.va() == 0) {
             // nullptr is inaccessible even to the kernel
-            it.map(it.va(), 0);
+            it.map(it.pa(), 0);
         }
         // If console page or in application area of memory make user accessible
         else if (it.va() == CONSOLE_ADDR || it.va() >= PROC_START_ADDR) {
-            it.map(it.va(), PTE_P | PTE_W | PTE_U);
+            it.map(it.pa(), PTE_P | PTE_W | PTE_U);
         }
         // Otherwise make kernel only
         else {
-            it.map(it.va(), PTE_P | PTE_W);
+            it.map(it.pa(), PTE_P | PTE_W);
         }
     }
 
