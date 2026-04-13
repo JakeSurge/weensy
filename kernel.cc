@@ -196,8 +196,8 @@ void process_setup(pid_t pid, const char* program_name) {
     ptable[pid].regs.reg_rip = pgm.entry();
 
     // allocate and map stack segment
-    // Compute process virtual address for stack page
-    uintptr_t stack_addr = PROC_START_ADDR + PROC_SIZE * pid - PAGESIZE;
+    // Set stack page to virtual memory limit
+    uintptr_t stack_addr = MEMSIZE_VIRTUAL - PAGESIZE;
     
     // Verify and allocate physical page address
     void* pa = kalloc(PAGESIZE);
