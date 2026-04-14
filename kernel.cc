@@ -299,6 +299,7 @@ void exception(regstate* regs) {
 //    Note that hardware interrupts are disabled when the kernel is running.
 
 int syscall_page_alloc(uintptr_t addr);
+int syscall_fork();
 
 uintptr_t syscall(regstate* regs) {
     // Copy the saved registers into the `current` process descriptor.
@@ -333,6 +334,9 @@ uintptr_t syscall(regstate* regs) {
 
     case SYSCALL_PAGE_ALLOC:
         return syscall_page_alloc(current->regs.reg_rdi);
+
+    case SYSCALL_FORK:
+        return syscall_fork();
 
     default:
         panic("Unexpected system call %ld!\n", regs->reg_rax);
@@ -371,6 +375,70 @@ int syscall_page_alloc(uintptr_t addr) {
     memset(pa, 0, PAGESIZE);
     
     return 0;
+}
+
+
+// syscall_fork
+//    Handles the SYSCALL_FORK system call. This function
+//    should implement the specification for `sys_fork`
+//    in `u-lib.hh`
+
+int syscall_fork() {
+    // Find free process slot in ptable
+    int child_pid = 0;
+    for (int i = 1; i < NPROC; i++) {
+        if (ptable[i].state == P_FREE) {
+            child_pid = i;
+            break;
+        }
+    }
+
+    // If no process available return -1
+    if (child_pid == 0) {
+        return -1;
+    }
+
+    // Initialize process page table
+    ptable[child_pid].pagetable = kalloc_pagetable();
+
+    // Copy memory mappings from parent
+    for (vmiter ppt(ptable[current->pid].pagetable), cpt(ptable[child_pid].pagetable);
+         ppt.va() < MEMSIZE_VIRTUAL;
+         ppt += PAGESIZE, cpt += PAGESIZE) {
+        // Directly copy kernel memory mappings
+        if (ppt.va() < PROC_START_ADDR) {
+            if (cpt.try_map(ppt.pa(), ppt.perm()) < 0) {
+                return -1;
+            }
+        } 
+        // Create copies of process memory
+        else if (ppt.kptr() != nullptr) {
+            // Allocate more memory
+            void* pa = kalloc(PAGESIZE);
+            if (pa == nullptr) {
+                return -1;
+            }
+
+            // Try to map
+            if (cpt.try_map(pa, ppt.perm()) < 0) {
+                // Decrease refcount since mapping failed
+                --physpages[ (uintptr_t) pa / PAGESIZE].refcount;
+                return -1;
+            }
+
+            // Copy data from parent physical memory to child physical memory
+            memcpy(pa, ppt.kptr(), PAGESIZE);
+        }
+    }
+
+    // Set PID, registers, and state
+    ptable[child_pid].pid = child_pid;
+    ptable[child_pid].regs = current->regs;
+    ptable[child_pid].state = P_RUNNABLE;
+
+    // Return PIDs
+    ptable[child_pid].regs.reg_rax = 0;
+    return child_pid;
 }
 
 
