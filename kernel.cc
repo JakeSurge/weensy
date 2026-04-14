@@ -186,7 +186,7 @@ void process_setup(pid_t pid, const char* program_name) {
     // initialize data in loadable segments
     for (auto seg = pgm.begin(); seg != pgm.end(); ++seg) {
         // Find physical addr with virtual via pagetable
-        void* pa = (void*) pt.find(seg.va()).pa();
+        void* pa = pt.find(seg.va()).kptr();
         
         memset(pa, 0, seg.size());
         memcpy(pa, seg.data(), seg.data_size());
