@@ -385,8 +385,8 @@ int syscall_page_alloc(uintptr_t addr) {
 
     // Try to map to current process pagetable
     if ((vmiter(ptable[current->pid].pagetable).find(addr).try_map(pa, PTE_P | PTE_W | PTE_U)) < 0) {
-        // Decrease refcount since mapping failed
-        --physpages[ (uintptr_t) pa / PAGESIZE].refcount;
+        // Free memory since mapping failed
+        kfree(pa);
         return -1;
     }
 
@@ -440,8 +440,8 @@ int syscall_fork() {
 
             // Try to map
             if (cpt.try_map(pa, ppt.perm()) < 0) {
-                // Decrease refcount since mapping failed
-                --physpages[ (uintptr_t) pa / PAGESIZE].refcount;
+                // Free memory since mapping failed
+                kfree(pa);
                 return -1;
             }
 
