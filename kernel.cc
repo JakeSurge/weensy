@@ -385,24 +385,24 @@ int syscall_page_alloc(uintptr_t addr) {
 
 int syscall_fork() {
     // Find free process slot in ptable
-    int child_pid = 0;
+    int childpid = 0;
     for (int i = 1; i < NPROC; i++) {
         if (ptable[i].state == P_FREE) {
-            child_pid = i;
+            childpid = i;
             break;
         }
     }
 
     // If no process available return -1
-    if (child_pid == 0) {
+    if (childpid == 0) {
         return -1;
     }
 
     // Initialize process page table
-    ptable[child_pid].pagetable = kalloc_pagetable();
+    ptable[childpid].pagetable = kalloc_pagetable();
 
     // Copy memory mappings from parent
-    for (vmiter ppt(ptable[current->pid].pagetable), cpt(ptable[child_pid].pagetable);
+    for (vmiter ppt(ptable[current->pid].pagetable), cpt(ptable[childpid].pagetable);
          ppt.va() < MEMSIZE_VIRTUAL;
          ppt += PAGESIZE, cpt += PAGESIZE) {
         // Directly copy kernel memory mappings
@@ -432,13 +432,13 @@ int syscall_fork() {
     }
 
     // Set PID, registers, and state
-    ptable[child_pid].pid = child_pid;
-    ptable[child_pid].regs = current->regs;
-    ptable[child_pid].state = P_RUNNABLE;
+    ptable[childpid].pid = childpid;
+    ptable[childpid].regs = current->regs;
+    ptable[childpid].state = P_RUNNABLE;
 
     // Return PIDs
-    ptable[child_pid].regs.reg_rax = 0;
-    return child_pid;
+    ptable[childpid].regs.reg_rax = 0;
+    return childpid;
 }
 
 
