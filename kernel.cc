@@ -139,8 +139,27 @@ void* kalloc(size_t sz) {
 //    If `kptr == nullptr` does nothing.
 
 void kfree(void* kptr) {
-    (void) kptr;
-    assert(false /* your code here */);
+    // If nullptr passed do nothing
+    if (kptr == nullptr) {
+        return;
+    }
+
+    // Verify kptr is a page size multiple and not outside max size
+    assert(((uintptr_t) kptr & PAGEOFFMASK) == 0 || (uintptr_t) kptr < MEMSIZE_PHYSICAL);
+
+    // Grab refcount
+    uint8_t* refcount = &physpages[ (uintptr_t) kptr / PAGESIZE].refcount;
+    
+    // Verify refcount is greater than 0
+    assert(*refcount > 0);
+
+    // Decrement refcount by 1
+    --*refcount;
+
+    // If refcount 0 now 0 out memory
+    if (*refcount == 0) {
+        memset(kptr, 0, PAGESIZE);
+    }
 }
 
 
