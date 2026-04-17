@@ -319,6 +319,7 @@ void exception(regstate* regs) {
 
 int syscall_page_alloc(uintptr_t addr);
 int syscall_fork();
+void syscall_exit();
 
 uintptr_t syscall(regstate* regs) {
     // Copy the saved registers into the `current` process descriptor.
@@ -356,6 +357,10 @@ uintptr_t syscall(regstate* regs) {
 
     case SYSCALL_FORK:
         return syscall_fork();
+
+    case SYSCALL_EXIT:
+        syscall_exit();
+        schedule();
 
     default:
         panic("Unexpected system call %ld!\n", regs->reg_rax);
@@ -402,6 +407,8 @@ int syscall_page_alloc(uintptr_t addr) {
 //    should implement the specification for `sys_fork`
 //    in `u-lib.hh`
 
+void free_process(pid_t pid);
+
 int syscall_fork() {
     // Find free process slot in ptable
     int childpid = 0;
@@ -427,6 +434,7 @@ int syscall_fork() {
         // Directly copy kernel memory mappings
         if (ppt.va() < PROC_START_ADDR) {
             if (cpt.try_map(ppt.pa(), ppt.perm()) < 0) {
+                free_process(childpid);
                 return -1;
             }
         } 
@@ -435,6 +443,7 @@ int syscall_fork() {
             // Allocate more memory
             void* pa = kalloc(PAGESIZE);
             if (pa == nullptr) {
+                free_process(childpid);
                 return -1;
             }
 
@@ -442,6 +451,8 @@ int syscall_fork() {
             if (cpt.try_map(pa, ppt.perm()) < 0) {
                 // Free memory since mapping failed
                 kfree(pa);
+
+                free_process(childpid);
                 return -1;
             }
 
@@ -458,6 +469,45 @@ int syscall_fork() {
     // Return PIDs
     ptable[childpid].regs.reg_rax = 0;
     return childpid;
+}
+
+// syscall_fork
+//    Handles the SYSCALL_EXIT system call. This function
+//    should implement the specification for `sys_exit`
+//    in `u-lib.hh`
+
+void syscall_exit() {
+    free_process(current->pid);
+}
+
+// Deallocates all process memory and page table
+// memory for the given process
+
+void free_process(pid_t pid) {
+    // Deallocate all process memory
+    for (vmiter pt(ptable[pid].pagetable, PROC_START_ADDR);
+         pt.va() < MEMSIZE_VIRTUAL;
+         pt += PAGESIZE) {
+        
+        // If mapping exists kfree it
+        if (pt.kptr() != nullptr) {
+            kfree(pt.kptr());
+        }
+    }
+
+    // Deallocate page table memory
+    for (ptiter pt(ptable[pid].pagetable);
+         pt.va() < MEMSIZE_VIRTUAL;
+         pt.next()) {
+        kfree(pt.kptr());
+    }
+
+    // Deallocate top level page table
+    kfree(ptable[pid].pagetable);
+    ptable[pid].pagetable = nullptr;
+
+    // Mark instance free
+    ptable[pid].state = P_FREE;
 }
 
 
