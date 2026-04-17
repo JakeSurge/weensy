@@ -384,7 +384,7 @@ int syscall_page_alloc(uintptr_t addr) {
     }
 
     // Try to map to current process pagetable
-    if ((vmiter(ptable[current->pid].pagetable).find(addr).try_map(pa, PTE_P | PTE_W | PTE_U)) < 0) {
+    if ((vmiter(ptable[current->pid].pagetable, addr).try_map(pa, PTE_P | PTE_W | PTE_U)) < 0) {
         // Free memory since mapping failed
         kfree(pa);
         return -1;
