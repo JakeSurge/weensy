@@ -173,6 +173,7 @@ void process_setup(pid_t pid, const char* program_name) {
 
     // initialize process page table
     ptable[pid].pagetable = kalloc_pagetable();
+    assert(ptable[pid].pagetable != nullptr);
 
     // Create vmiter for process page table
     vmiter pt(ptable[pid].pagetable);
@@ -426,6 +427,9 @@ int syscall_fork() {
 
     // Initialize process page table
     ptable[childpid].pagetable = kalloc_pagetable();
+    if (ptable[childpid].pagetable == nullptr) {
+        return -1;
+    }
 
     // Copy memory mappings from parent
     for (vmiter ppt(ptable[current->pid].pagetable), cpt(ptable[childpid].pagetable);
