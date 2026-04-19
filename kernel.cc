@@ -199,7 +199,11 @@ void process_setup(pid_t pid, const char* program_name) {
             assert(pa != nullptr);
 
             // Map global memory
-            pt.find(a).map(pa, PTE_P | PTE_W | PTE_U);
+            if (seg.writable()) {
+                pt.find(a).map(pa, PTE_P | PTE_W | PTE_U);
+            } else {
+                pt.find(a).map(pa, PTE_P | PTE_U);
+            }
         }
     }
 
@@ -442,26 +446,40 @@ int syscall_fork() {
                 return -1;
             }
         } 
-        // Create copies of process memory
+        // If process memory mapped copy it or share
         else if (ppt.kptr() != nullptr) {
-            // Allocate more memory
-            void* pa = kalloc(PAGESIZE);
-            if (pa == nullptr) {
-                free_process(childpid);
-                return -1;
+            // Create copies of process memory if writable
+            if ((ppt.perm() & PTE_W) != 0) {
+                // Allocate more memory
+                void* pa = kalloc(PAGESIZE);
+                if (pa == nullptr) {
+                    free_process(childpid);
+                    return -1;
+                }
+
+                // Try to map
+                if (cpt.try_map(pa, ppt.perm()) < 0) {
+                    // Free memory since mapping failed
+                    kfree(pa);
+
+                    free_process(childpid);
+                    return -1;
+                }
+
+                // Copy data from parent physical memory to child physical memory
+                memcpy(pa, ppt.kptr(), PAGESIZE);
+            } 
+            // If not writable copy mapping, bump refcount for shared memory
+            else {
+                // Try to map
+                if (cpt.try_map(ppt.pa(), ppt.perm()) < 0) {
+                    free_process(childpid);
+                    return -1;
+                }
+
+                // Bump refcount
+                ++physpages[ppt.pa() / PAGESIZE].refcount;
             }
-
-            // Try to map
-            if (cpt.try_map(pa, ppt.perm()) < 0) {
-                // Free memory since mapping failed
-                kfree(pa);
-
-                free_process(childpid);
-                return -1;
-            }
-
-            // Copy data from parent physical memory to child physical memory
-            memcpy(pa, ppt.kptr(), PAGESIZE);
         }
     }
 
